@@ -10,6 +10,9 @@
 #include "VertexArray.h"
 #include "Shader.h"
 
+#include "glm/glm.hpp"
+#include <glm/ext/matrix_clip_space.hpp>
+
 int main(void)
 {
     GLFWwindow* window;
@@ -64,10 +67,13 @@ int main(void)
         va.AddBuffer(vb, layout);
         IndexBuffer ib(indices, 6);
 
+        glm::mat4 proj = glm::ortho(-2.0f, 2.0f, -1.5f, 1.5f, -1.0f, 1.0f);
+
         Shader shader("res/shaders/Basic.shader");
         shader.Bind();
         shader.SetUniform4f("u_Color", 1.0, 0.5, 0.25, 1.0);
         shader.SetUniform1f("u_Time", 0.0f);
+        shader.SetUniformMat4f("u_MVP", proj);
 
         // unbinding
         va.Unbind();

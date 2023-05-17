@@ -4,6 +4,7 @@
 layout(location = 0) in vec4 position;
 
 uniform float u_Time;
+uniform mat4 u_MVP;
 
 
 void main()
@@ -18,7 +19,7 @@ void main()
     posx = mag * cos(u_Time + alpha) / 640.0;
     posy = mag * sin(u_Time + alpha) / 480.0;
 
-    gl_Position = vec4(posx,posy, 0.0, 1.0);
+    gl_Position = u_MVP * vec4(posx,posy, 0.0, 1.0);
 }
 
 #shader fragment
