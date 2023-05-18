@@ -9,17 +9,18 @@ uniform mat4 u_MVP;
 
 void main()
 {
-    float multx = 0.25 * sin(u_Time) + 1.0;
-    float multy = 0.25 * sin(u_Time*3) + 1.0;
-    float posx = position.x * 640 *multx;
-    float posy = position.y * 480 *multy;
-    float alpha = atan(posy,posx);
-    float mag = sqrt(pow(posy,2) + pow(posx,2));
+    vec4 pos = u_MVP * position;
+    //float multx = 0.25 * sin(u_Time) + 1.0;
+    //float multy = 0.25 * sin(u_Time) + 1.0;
+    //float posx = pos.x * 640 *multx;
+    //float posy = pos.y * 480 *multy;
+    //float alpha = atan(posy,posx);
+    //float mag = sqrt(pow(posy,2) + pow(posx,2));
 
-    posx = mag * cos(u_Time + alpha) / 640.0;
-    posy = mag * sin(u_Time + alpha) / 480.0;
+    //posx = mag * cos(u_Time + alpha) / 640.0;
+    //posy = mag * sin(u_Time + alpha) / 480.0;
 
-    gl_Position = u_MVP * vec4(posx,posy, 0.0, 1.0);
+    gl_Position = vec4(pos.x,pos.y, 0.0, 1.0);
 }
 
 #shader fragment
