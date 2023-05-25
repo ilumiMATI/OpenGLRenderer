@@ -17,12 +17,22 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
-glm::vec3 viewTranslation = glm::vec3(0, 0, 0);
-glm::vec3 viewRotation = glm::vec3(0, 0, 0);
-glm::vec4 viewDirection = glm::vec4(0, 0, -1, 0);
-glm::vec4 viewUpDirection = glm::vec4(0, 1, 0, 0);
-glm::mat4 view = glm::translate(glm::mat4(1.0f), viewTranslation);
+glm::vec3 cameraPosition = glm::vec3(0.0f, 0.0f, 3.0f);  // Camera position in world space
+glm::vec3 cameraDirection = glm::vec3(0.0f, 0.0f, -1.0f); // Point the camera is looking at
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);        // Up vector
+glm::mat4 view = glm::mat4(1.0f);
+
+glm::vec2 mouseInput;
+
+// Define camera movement variables
+float cameraSpeed = 0.5f;
+float cameraSensitivity = 0.5f;
+float yaw, pitch;
+
 double xpos, ypos, ypos_old, xpos_old;
+
+constexpr unsigned WIDTH = 1280;
+constexpr unsigned HEIGHT = 720;
 
 int main(void)
 {
@@ -38,7 +48,7 @@ int main(void)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(800, 600, "Hello World", NULL, NULL);
+    window = glfwCreateWindow(WIDTH, HEIGHT, "Camera Movement", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -87,8 +97,8 @@ int main(void)
             0, 3, 4,
             3, 4, 7,
             // right face
-            1, 2, 6,
-            2, 6, 5
+            1, 6, 2,
+            1, 6, 5
         };
 
         VertexArray va;
@@ -103,9 +113,8 @@ int main(void)
         glm::vec3 translationC = glm::vec3(0, 0, 0);
         glm::vec3 rotation = glm::vec3(0, 0, 0);
 
-        glm::mat4 proj = glm::ortho(0.0f, 800.0f, 0.0f, 600.0f, -50.0f, 50.0f);
-        proj = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 1000.0f);
-        //glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 0));
+        glm::mat4 proj = glm::ortho(0.0f, static_cast<float>(WIDTH), 0.0f, static_cast<float>(HEIGHT), -50.0f, 50.0f);
+        proj = glm::perspective(glm::radians(45.0f), static_cast<float>(WIDTH) / HEIGHT, 10.0f, 1000.0f);
         glm::mat4 model = glm::translate(glm::mat4(1.0f),translationA);
         model = model * glm::rotate(glm::mat4(1.0f), rotation.x, glm::vec3(1, 0, 0));
         model = model * glm::rotate(glm::mat4(1.0f), rotation.y, glm::vec3(0, 1, 0));
@@ -115,7 +124,6 @@ int main(void)
         Shader shader("res/shaders/Basic.shader");
         shader.Bind();
         shader.SetUniform4f("u_Color", 1.0, 0.5, 0.25, 1.0);
-        shader.SetUniform1f("u_Time", 0.0f);
         shader.SetUniformMat4f("u_MVP", mvp);
 
         // unbinding
@@ -133,10 +141,6 @@ int main(void)
 
         //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-        float t = 0.0f;
-        float dt = 0.00015f;
-        float r = 1.0;
-        float increment = 0.008f;
         glEnable(GL_DEPTH_TEST);
         /* Loop until the user closes the window */
         while (!glfwWindowShouldClose(window))
@@ -156,7 +160,7 @@ int main(void)
                 glm::mat4 mvp = proj * view * model;
                 shader.SetUniformMat4f("u_MVP", mvp);
 
-                shader.SetUniform4f("u_Color", 1.0, 0.5, 0.25, 1.0);
+                shader.SetUniform4f("u_Color", 1.0, 0.5, 0.25, 0.7);
                 renderer.Draw(va, ib, shader);
             }
             {
@@ -167,7 +171,7 @@ int main(void)
                 glm::mat4 mvp = proj * view * model;
                 shader.SetUniformMat4f("u_MVP", mvp);
 
-                shader.SetUniform4f("u_Color", 0.0, 0.5, 0.25, 1.0);
+                shader.SetUniform4f("u_Color", 0.0, 0.5, 0.25, 0.7);
                 renderer.Draw(va, ib, shader);
             }
             {
@@ -178,60 +182,95 @@ int main(void)
                 glm::mat4 mvp = proj * view * model;
                 shader.SetUniformMat4f("u_MVP", mvp);
 
-                shader.SetUniform4f("u_Color", 0.0, 0.1, 0.25, 1.0);
+                shader.SetUniform4f("u_Color", 0.0, 0.1, 0.25, 0.7);
                 renderer.Draw(va, ib, shader);
             }
+            static bool cameraRotationActive = 0;
+            static bool lastCheck = 0;
+            if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) && glfwGetKey(window, GLFW_KEY_LEFT_CONTROL))
+            {
+                if(lastCheck == 0)
+                    cameraRotationActive = !cameraRotationActive;
+                lastCheck = 1;
+            }
+            else lastCheck = 0;
 
-            if (r >= 1.0f)
-                increment = -increment;
-            else if (r <= 0.0f)
-                increment = -increment;
-
-            r += increment;
-            t += dt;
 
             // camera rotation
             glfwGetCursorPos(window, &xpos, &ypos);
-            viewRotation.y += (xpos - xpos_old) * 0.01;
-            viewRotation.x += (ypos - ypos_old) * 0.01;
+            if (cameraRotationActive) 
+            {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                yaw += (xpos - xpos_old) * cameraSensitivity;
+                pitch += (ypos - ypos_old) * cameraSensitivity;
+            }
+            else
+            {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            }
             xpos_old = xpos;
             ypos_old = ypos;
 
-            auto firstRot = glm::rotate(glm::mat4(1.0f), viewRotation.y, glm::vec3(0, 1, 0));
-            auto secondRot = glm::rotate(glm::mat4(1.0f), viewRotation.x, glm::vec3(1, 0, 0));
+            // Clamp pitch to avoid flipping the camera
+            if (pitch > 89.0f)
+                pitch = 89.0f;
+            if (pitch < -89.0f)
+                pitch = -89.0f;
 
-            viewDirection = firstRot * secondRot * viewDirection;
-            viewUpDirection = firstRot * secondRot * viewUpDirection;
+            // if vec3 rotation worked
+            // glm::vec3 newCameraDirection = glm::rotate(cameraDirection, glm::radians(-yaw), glm::normalize(cameraUp));
 
+            glm::mat4 yawRot = glm::rotate(glm::mat4(1), glm::radians(-yaw), glm::normalize(cameraUp));
+            glm::vec3 newCameraDirection = glm::vec3(yawRot * glm::vec4(cameraDirection,0.0));
+
+            glm::mat4 pitchRot = glm::rotate(glm::mat4(1), glm::radians(-pitch), glm::normalize(glm::cross(newCameraDirection, cameraUp)));
+            newCameraDirection = glm::vec3(pitchRot * glm::vec4(newCameraDirection, 0.0));
+            glm::vec3 newCameraUp = glm::vec3(pitchRot * glm::vec4(cameraUp, 0.0));
+            static float speedMultiplier = 1.0f;
+            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))
+                speedMultiplier = 2.0f;
+            else
+                speedMultiplier = 1.0f;
             // camera translation
             if (glfwGetKey(window, GLFW_KEY_W))
             {
-                viewTranslation.x += viewDirection.x;
-                viewTranslation.y += viewDirection.y;
-                viewTranslation.z += viewDirection.z;
+                cameraPosition += glm::normalize(newCameraDirection) * cameraSpeed * speedMultiplier;
+
             }
             if (glfwGetKey(window, GLFW_KEY_S))
             {
-                viewTranslation.x -= viewDirection.x;
-                viewTranslation.y -= viewDirection.y;
-                viewTranslation.z -= viewDirection.z;
+                cameraPosition -= glm::normalize(newCameraDirection) * cameraSpeed * speedMultiplier;
             }
-            
+            if (glfwGetKey(window, GLFW_KEY_A))
+            {
+                cameraPosition -= glm::normalize(glm::cross(newCameraDirection, newCameraUp)) * cameraSpeed * speedMultiplier;
+            }
+            if (glfwGetKey(window, GLFW_KEY_D))
+            {
+                cameraPosition += glm::normalize(glm::cross(newCameraDirection, newCameraUp)) * cameraSpeed * speedMultiplier;
+            }
+            if (glfwGetKey(window, GLFW_KEY_SPACE))
+            {
+                cameraPosition += glm::normalize(newCameraUp) * cameraSpeed * speedMultiplier;
+            }
+            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL))
+            {
+                cameraPosition -= glm::normalize(newCameraUp) * cameraSpeed * speedMultiplier;
+            }
 
-            glm::mat4 trans = glm::translate(glm::mat4(1.0f), viewTranslation);
-            glm::mat4 rotx = glm::rotate(glm::mat4(1.0f), viewRotation.x, glm::vec3(1, 0, 0));
-            glm::mat4 roty = glm::rotate(glm::mat4(1.0f), viewRotation.y, glm::vec3(0, 1, 0));
-            //glm::mat4 rotz = glm::rotate(glm::mat4(1.0f), viewRotation.z, glm::vec3(0, 0, 1));
 
-            view = trans * roty * rotx;
+            /*glm::mat4 viewMatrix(1.0f);
+            viewMatrix = glm::rotate(viewMatrix, glm::radians(pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+            viewMatrix = glm::rotate(viewMatrix, glm::radians(yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+            viewMatrix = glm::translate(viewMatrix, -cameraPosition);*/
 
-
+            view = glm::lookAt(cameraPosition,cameraPosition + newCameraDirection, newCameraUp);
 
             {
                 ImGui::Begin("Debug"); // Create a window called "Hello, world!" and append into it.
-                ImGui::SliderFloat3("TranslationA", &translationA.x, -800.0f, 800.0f); 
-                ImGui::SliderFloat3("TranslationB", &translationB.x, -800.0f, 800.0f);
-                ImGui::SliderFloat3("TranslationC", &translationC.x, -800.0f, 800.0f);
+                ImGui::SliderFloat3("TranslationA", &translationA.x, -200.0f, 200.0f); 
+                ImGui::SliderFloat3("TranslationB", &translationB.x, -200.0f, 200.0f);
+                ImGui::SliderFloat3("TranslationC", &translationC.x, -200.0f, 200.0f);
                 ImGui::SliderFloat3("Rotation", &rotation.x, 0.0f, 3.14*2);
 
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

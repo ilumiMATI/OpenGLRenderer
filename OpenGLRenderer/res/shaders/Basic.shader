@@ -3,7 +3,6 @@
 
 layout(location = 0) in vec4 position;
 
-uniform float u_Time;
 uniform mat4 u_MVP;
 
 
